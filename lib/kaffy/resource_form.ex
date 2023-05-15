@@ -462,9 +462,25 @@ defmodule Kaffy.ResourceForm do
   defp build_changeset_value(value), do: to_string(value)
 
   def kaffy_input(conn, changeset, form, field, options) do
-    ft = Kaffy.ResourceSchema.field_type(changeset.data.__struct__, field)
+    control_type_override = options[:control_type]
 
-    case Kaffy.Utils.is_module(ft) && Keyword.has_key?(ft.__info__(:functions), :render_form) do
+    ft =
+      case control_type_override do
+        nil ->
+          field_type = Kaffy.ResourceSchema.field_type(changeset.data.__struct__, field)
+
+          if Kaffy.Utils.is_module(field_type) &&
+               Keyword.has_key?(field_type.__info__(:functions), :render_form) do
+            field_type
+          else
+            nil
+          end
+
+        _ ->
+          control_type_override
+      end
+
+    case ft != nil do
       true ->
         ft.render_form(conn, changeset, form, field, options)
 
@@ -481,7 +497,7 @@ defmodule Kaffy.ResourceForm do
               conn: conn
             )
 
-          field_feeback = [
+          field_feedback = [
             content_tag :div, class: "invalid-feedback" do
               error_msg
             end,
@@ -490,12 +506,32 @@ defmodule Kaffy.ResourceForm do
             end
           ]
 
-          [label_tag, field_tag, field_feeback]
+          [label_tag, field_tag, field_feedback]
         end
     end
   end
 
   defp add_class(opts, class) do
     Keyword.update(opts, :class, class, &"#{&1} #{class}")
+  end
+
+  def list_action_kaffy_input(form, field, title, type \\ :text, options \\ []) do
+    label_tag = title
+    field_tag = generate_field_tag(field, type)
+
+    [label_tag, field_tag]
+  end
+
+  def generate_field_tag(field, type) do
+    case type do
+      :file ->
+        tag(:input, type: "file", name: "kaffy_input[#{field}]")
+
+      :text ->
+        text_input(:kaffy_input, field)
+
+      _ ->
+        text_input(:kaffy_input, field)
+    end
   end
 end

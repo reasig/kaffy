@@ -57,6 +57,9 @@ defmodule Kaffy.ResourceQuery do
     query = from(s in schema, where: ^id_filter)
 
     case Kaffy.ResourceAdmin.custom_show_query(conn, resource, query) do
+      {custom_query, after_fetch: after_fetch} when is_function(after_fetch) ->
+      entity = Kaffy.Utils.repo().one(custom_query)
+      after_fetch.(entity)
       {custom_query, opts} -> Kaffy.Utils.repo().one(custom_query, opts)
       custom_query -> Kaffy.Utils.repo().one(custom_query)
     end
