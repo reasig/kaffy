@@ -124,7 +124,9 @@
                   <div class="modal-body">
                     <%= for {field, options} <- extra_inputs do %>
                       <div class="form-group">
+                      <%= if options.update != :hidden do %>
                         <%= Kaffy.ResourceForm.kaffy_input @conn, changeset, f, field, options %>
+                      <% end %>
                       </div>
                     <% end %>
                   </div>
