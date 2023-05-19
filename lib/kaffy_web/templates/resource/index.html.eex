@@ -109,9 +109,9 @@
 <%= for {action_key, options} <- list_actions do %>
   <% extra_inputs = Map.get(options, :inputs, []) %>
   <% changeset = Map.get(options, :changeset, []) %>
-
   <%= if !Enum.empty?(extra_inputs) do %>
-    <%= f = form_tag(Kaffy.Utils.router().kaffy_resource_path(@conn, :list_action, @context, @resource, to_string(action_key)), method: :post, class: "list-action", id: "#{action_key}_form") %>
+
+    <%= form_for changeset, Kaffy.Utils.router().kaffy_resource_path(@conn, :list_action, @context, @resource, to_string(action_key)), [method: :post], fn f -> %>
       <div class="modal fade" id="<%= action_key %>_modal" tabindex="-1" role="dialog" aria-labelledby="<%= action_key %>_modal_label" aria-hidden="true">
           <div class="modal-dialog" role="document">
               <div class="modal-content">
@@ -138,5 +138,6 @@
           </div>
       </div>
     <% end %>
-  </form>
+  <% end %>
+</form>
 <% end %>

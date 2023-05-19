@@ -6,7 +6,7 @@ defmodule Kaffy.ResourceForm do
 
   def form_label(form, field) do
     label_text = form_label_string(field)
-    label(form, label_text)
+    label(form,label_text)
   end
 
   def form_help_text({_field, options}), do: Map.get(options, :help_text, nil)
