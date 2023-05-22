@@ -99,10 +99,8 @@
 <% list_actions = Kaffy.ResourceAdmin.list_actions(@my_resource, @conn) || [] %>
 <%= for {action_key, options} <- list_actions do %>
   <% extra_inputs = Map.get(options, :inputs, []) %>
-  <% changeset = Map.get(options, :changeset, []) %>
   <%= if !Enum.empty?(extra_inputs) do %>
-
-    <%= form_for changeset, Kaffy.Utils.router().kaffy_resource_path(@conn, :list_action, @context, @resource, to_string(action_key)), [method: :post, multipart: true], fn f -> %>
+    <%= f = form_tag(Kaffy.Utils.router().kaffy_resource_path(@conn, :list_action, @context, @resource, to_string(action_key)), method: :post, class: "list-action",multipart: true, id: "#{action_key}_form") %>
       <div class="modal fade" id="<%= action_key %>_modal" tabindex="-1" role="dialog" aria-labelledby="<%= action_key %>_modal_label" aria-hidden="true">
           <div class="modal-dialog" role="document">
               <div class="modal-content">
@@ -113,11 +111,18 @@
                       </button>
                   </div>
                   <div class="modal-body">
-                    <%= for {field, options} <- extra_inputs do %>
+                    <%= for extra <- extra_inputs do %>
                       <div class="form-group">
-                      <%= if options.update != :hidden do %>
-                        <%= Kaffy.ResourceForm.kaffy_input @conn, changeset, f, field, options %>
-                      <% end %>
+                        <%= if Map.has_key?(extra, :use_select) && extra.use_select do %>
+                          <label><%= extra.title %></label>
+                          <select data-title="<%= extra.title %>" name="kaffy-input[<%= extra.name %>]" class="form-select w-100 kaffy-list-action-input">
+                            <%= for [text, value] <- extra.options do %>
+                              <option value="<%= value %>"><%= text %></option>
+                            <% end %>
+                          </select>
+                        <% else %>
+                            <%= Kaffy.ResourceForm.list_action_kaffy_input(f, extra.name , extra.type, extra.title) %>
+                        <% end %>
                       </div>
                     <% end %>
                   </div>
@@ -129,6 +134,5 @@
           </div>
       </div>
     <% end %>
-  <% end %>
-</form>
+  </form>
 <% end %>

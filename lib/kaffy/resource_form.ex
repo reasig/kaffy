@@ -6,7 +6,7 @@ defmodule Kaffy.ResourceForm do
 
   def form_label(form, field) do
     label_text = form_label_string(field)
-    label(form,label_text)
+    label(form, label_text)
   end
 
   def form_help_text({_field, options}), do: Map.get(options, :help_text, nil)
@@ -458,7 +458,7 @@ defmodule Kaffy.ResourceForm do
               conn: conn
             )
 
-          field_feeback = [
+          field_feedback = [
             content_tag :div, class: "invalid-feedback" do
               error_msg
             end,
@@ -467,8 +467,28 @@ defmodule Kaffy.ResourceForm do
             end
           ]
 
-          [label_tag, field_tag, field_feeback]
+          [label_tag, field_tag, field_feedback]
         end
+    end
+  end
+
+  def list_action_kaffy_input(form, field, type, title, options \\ []) do
+    label_tag = Atom.to_string(title)
+    field_tag = generate_field_tag(field, type)
+
+    [label_tag, field_tag]
+  end
+
+  def generate_field_tag(field, type) do
+    case type do
+      :file ->
+        tag(:input, type: "file", name: "kaffy_input[#{field}]")
+
+      :text ->
+        text_input(:kaffy_input, field)
+
+      _ ->
+        text_input(:kaffy_input, field)
     end
   end
 end

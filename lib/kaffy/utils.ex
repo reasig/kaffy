@@ -335,6 +335,7 @@ defmodule Kaffy.Utils do
     stylesheets =
       Enum.map(exts, fn ext ->
         Code.ensure_loaded(ext)
+
         case function_exported?(ext, :stylesheets, 1) do
           true -> ext.stylesheets(conn)
           false -> []
@@ -344,6 +345,7 @@ defmodule Kaffy.Utils do
     javascripts =
       Enum.map(exts, fn ext ->
         Code.ensure_loaded(ext)
+
         case function_exported?(ext, :javascripts, 1) do
           true -> ext.javascripts(conn)
           false -> []
