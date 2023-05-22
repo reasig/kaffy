@@ -130,7 +130,11 @@
                             <% end %>
                           </select>
                         <% else %>
-                            <%= Kaffy.ResourceForm.list_action_kaffy_input(f, extra.name , extra.type, extra.title) %>
+                            <%= if Map.has_key?(extra, :type) do %>
+                            <%= Kaffy.ResourceForm.list_action_kaffy_input(f, extra.name , extra.title, extra.type) %>
+                            <%else%>
+                            <%= Kaffy.ResourceForm.list_action_kaffy_input(f, extra.name , extra.title) %>
+                            <% end %>
                         <% end %>
                       </div>
                     <% end %>
