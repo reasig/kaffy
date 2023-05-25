@@ -494,7 +494,7 @@ defmodule Kaffy.ResourceForm do
   end
 
   def list_action_kaffy_input(form, field, title, type \\ :text, options \\ []) do
-    label_tag = Atom.to_string(title)
+    label_tag = title
     field_tag = generate_field_tag(field, type)
 
     [label_tag, field_tag]
