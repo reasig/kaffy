@@ -138,11 +138,11 @@ defmodule Kaffy.ResourceQuery do
 
               Enum.reduce(fields, query, fn f, current_query ->
                 from([..., r] in current_query,
-                or_where: type(field(r, ^f), :string) == ^term)
+                or_where: field(r, ^f) == ^term)
               end)
 
             f, q ->
-              from(s in q, or_where: type(field(s, ^f), :string) == ^term)
+              from(s in q, or_where: field(s, ^f) == ^term)
           end)
       end
 
