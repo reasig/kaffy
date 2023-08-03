@@ -119,15 +119,26 @@ defmodule Kaffy.ResourceQuery do
           query
 
         true ->
-          term =
-            search
+          term = search
+
+          search_term_type = typeof(term)
+
+          search_fields =
+            search_fields
+            |> filter_unnasociated_fields(schema, search_term_type)
 
           Enum.reduce(search_fields, query, fn
             {association, fields}, q ->
+              fields =
+                fields
+                |> filter_associated_fields(schema, association, search_term_type)
+
               query = from(s in q, join: a in assoc(s, ^association))
+
               Enum.reduce(fields, query, fn f, current_query ->
                 from([..., r] in current_query,
-                or_where: field(r, ^f) == ^term)
+                  or_where: field(r, ^f) == ^term
+                )
               end)
 
             f, q ->
@@ -141,6 +152,58 @@ defmodule Kaffy.ResourceQuery do
       from(s in query, limit: ^per_page, offset: ^current_offset, order_by: ^ordering)
 
     {query, limited_query}
+  end
+
+  defp typeof(value) do
+    cond do
+      is_binary_id?(value) -> :binary_id
+      is_id?(value) -> :id
+      true -> :string
+    end
+  end
+
+  def is_binary_id?(str) when is_binary(str) do
+    str |> String.match?(~r/\A[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\z/i)
+  end
+
+  def is_binary_id?(_), do: false
+
+  def is_id?(str) when is_binary(str) do
+    case Integer.parse(str) do
+      {int, ""} when int > 0 -> true
+      _ -> false
+    end
+  end
+
+  def is_id?(_), do: false
+
+  def is_association?(search_field) when is_atom(search_field) do
+    false
+  end
+
+  def is_association?(_), do: true
+
+  defp filter_unnasociated_fields(search_fields, schema, search_term_type) do
+    Enum.filter(search_fields, fn search_field ->
+      case is_association?(search_field) do
+        false ->
+          field_type = Kaffy.ResourceSchema.field_type(schema, search_field)
+          field_type == search_term_type
+
+        _ ->
+          true
+      end
+    end)
+  end
+
+  defp filter_associated_fields(fields, schema, association, search_term_type) do
+    Enum.filter(fields, fn field ->
+      association_schema =
+        Kaffy.ResourceSchema.association(schema, association).related
+
+      field_type = Kaffy.ResourceSchema.field_type(association_schema, field)
+      field_type == search_term_type
+    end)
   end
 
   defp build_filtered_fields_query(query, []), do: query
