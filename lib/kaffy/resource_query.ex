@@ -57,6 +57,11 @@ defmodule Kaffy.ResourceQuery do
     query = from(s in schema, where: ^id_filter)
 
     case Kaffy.ResourceAdmin.custom_show_query(conn, resource, query) do
+      {custom_query, :decode_traveler} ->
+        traveler = Kaffy.Utils.repo().one(custom_query)
+
+        traveler
+        |> PII.load_pii(traveler.customer_uuid, PIIFields.traveler_pii_fields())
       {custom_query, opts} -> Kaffy.Utils.repo().one(custom_query, opts)
       custom_query -> Kaffy.Utils.repo().one(custom_query)
     end
