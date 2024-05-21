@@ -343,7 +343,6 @@ defmodule KaffyWeb.ResourceController do
     entry = Kaffy.ResourceQuery.fetch_resource(conn, my_resource, id)
     actions = Kaffy.ResourceAdmin.resource_actions(my_resource, conn)
     action_record = get_action_record(actions, action_key)
-    IO.inspect(entry)
 
     case action_record.action.(conn, entry) do
       {:ok, entry} ->
