@@ -178,10 +178,8 @@ defmodule Kaffy.ResourceQuery do
 
                 if Kaffy.ResourceSchema.field_type(the_association, f) == :string or
                      term_type == :string do
-                  term = "%#{term}%"
-
                   from([..., r] in current_query,
-                    or_where: ilike(type(field(r, ^f), :string), ^term)
+                    or_where: field(r, ^f) == ^term
                   )
                 else
                   if Kaffy.ResourceSchema.field_type(schema, f) in [:id, :integer] and
@@ -197,8 +195,7 @@ defmodule Kaffy.ResourceQuery do
 
             {f, t}, q when is_atom(t) ->
               if Kaffy.ResourceSchema.field_type(schema, f) == :string or term_type == :string do
-                term = "%#{term}%"
-                from(s in q, or_where: ilike(type(field(s, ^f), :string), ^term))
+                from(s in q, or_where: field(s, ^f) == ^term)
               else
                 if Kaffy.ResourceSchema.field_type(schema, f) in [:id, :integer] and
                      term_type == :decimal do
@@ -209,8 +206,7 @@ defmodule Kaffy.ResourceQuery do
               end
 
             f, q ->
-              term = "%#{term}%"
-              from(s in q, or_where: ilike(type(field(s, ^f), :string), ^term))
+              from(s in q, or_where: field(s, ^f) == ^term)
           end)
       end
 
