@@ -137,73 +137,26 @@ defmodule Kaffy.ResourceQuery do
             |> String.replace("%", "\%")
             |> String.replace("_", "\_")
 
-          {term, term_type} =
-            case Decimal.parse(term) do
-              {:ok, value} ->
-                # this is the return value for the decimal package pre-2.0
-                number = if value.exp >= 0, do: :integer, else: :decimal
+          search_term_type = typeof(term)
 
-                case number do
-                  :integer ->
-                    v = Decimal.to_integer(value) |> to_string()
-                    {v, number}
-
-                  :decimal ->
-                    {term, number}
-                end
-
-              {value, ""} ->
-                # this is the return value for the decimal package since 2.0
-                number = if Decimal.integer?(value), do: :integer, else: :decimal
-
-                case number do
-                  :integer ->
-                    v = Decimal.to_integer(value) |> to_string()
-                    {v, number}
-
-                  :decimal ->
-                    {term, number}
-                end
-
-              _ ->
-                {term, :string}
-            end
+          search_fields =
+            search_fields
+            |> filter_unnasociated_fields(schema, search_term_type)
 
           Enum.reduce(search_fields, query, fn
-            {association, fields}, q when is_list(fields) ->
-              query = from(s in q, left_join: a in assoc(s, ^association))
+            {association, fields}, q ->
+
+              fields =
+                fields
+                |> filter_associated_fields(schema, association, search_term_type)
+
+              query = from(s in q, join: a in assoc(s, ^association))
 
               Enum.reduce(fields, query, fn f, current_query ->
-                the_association = Kaffy.ResourceSchema.association(schema, association).queryable
-
-                if Kaffy.ResourceSchema.field_type(the_association, f) == :string or
-                     term_type == :string do
-                  from([..., r] in current_query,
-                    or_where: field(r, ^f) == ^term
-                  )
-                else
-                  if Kaffy.ResourceSchema.field_type(schema, f) in [:id, :integer] and
-                       term_type == :decimal do
-                    current_query
-                  else
-                    from([..., r] in current_query,
-                      or_where: field(r, ^f) == ^term
-                    )
-                  end
-                end
+                from([..., r] in current_query,
+                  or_where: field(r, ^f) == ^term
+                )
               end)
-
-            {f, t}, q when is_atom(t) ->
-              if Kaffy.ResourceSchema.field_type(schema, f) == :string or term_type == :string do
-                from(s in q, or_where: field(s, ^f) == ^term)
-              else
-                if Kaffy.ResourceSchema.field_type(schema, f) in [:id, :integer] and
-                     term_type == :decimal do
-                  q
-                else
-                  from(s in q, or_where: field(s, ^f) == ^term)
-                end
-              end
 
             f, q ->
               from(s in q, or_where: field(s, ^f) == ^term)
@@ -216,6 +169,58 @@ defmodule Kaffy.ResourceQuery do
       from(s in query, limit: ^per_page, offset: ^current_offset, order_by: ^ordering)
 
     {query, limited_query}
+  end
+
+  defp typeof(value) do
+    cond do
+      is_binary_id?(value) -> :binary_id
+      is_id?(value) -> :id
+      true -> :string
+    end
+  end
+
+  def is_binary_id?(str) when is_binary(str) do
+    str |> String.match?(~r/\A[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\z/i)
+  end
+
+  def is_binary_id?(_), do: false
+
+  def is_id?(str) when is_binary(str) do
+    case Integer.parse(str) do
+      {int, ""} when int > 0 -> true
+      _ -> false
+    end
+  end
+
+  def is_id?(_), do: false
+
+  def is_association?(search_field) when is_atom(search_field) do
+    false
+  end
+
+  def is_association?(_), do: true
+
+  defp filter_unnasociated_fields(search_fields, schema, search_term_type) do
+    Enum.filter(search_fields, fn search_field ->
+      case is_association?(search_field) do
+        false ->
+          field_type = Kaffy.ResourceSchema.field_type(schema, search_field)
+          field_type == search_term_type
+
+        _ ->
+          true
+      end
+    end)
+  end
+
+  defp filter_associated_fields(fields, schema, association, search_term_type) do
+    Enum.filter(fields, fn field ->
+      association_schema =
+        Kaffy.ResourceSchema.association(schema, association).related
+
+      field_type = Kaffy.ResourceSchema.field_type(association_schema, field)
+      field_type == search_term_type
+    end)
   end
 
   defp build_list_query(_schema, [], _key_pairs) do
