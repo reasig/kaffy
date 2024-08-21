@@ -123,52 +123,58 @@ defmodule Kaffy.ResourceQuery do
          ordering,
          current_offset
        ) do
-    query = from(s in schema)
+    cond do
+      is_nil(search_fields) || Enum.empty?(search_fields) || search == "" ->
+        query =
+          from(s in schema)
+          |> build_filtered_fields_query(filtered_fields)
 
-    query =
-      cond do
-        is_nil(search_fields) || Enum.empty?(search_fields) || search == "" ->
-          query
+        limited_query =
+          from(s in query, limit: ^per_page, offset: ^current_offset, order_by: ^ordering)
 
-        true ->
-          term =
-            search
-            |> String.trim()
-            |> String.replace("%", "\%")
-            |> String.replace("_", "\_")
+        {query, limited_query}
 
-          search_term_type = typeof(term)
+      true ->
+        term =
+          search
+          |> String.trim()
+          |> String.replace("%", "\%")
+          |> String.replace("_", "\_")
 
-          search_fields =
-            search_fields
-            |> filter_unnasociated_fields(schema, search_term_type)
+        search_term_type = typeof(term)
 
-          Enum.reduce(search_fields, query, fn
+        search_fields =
+          search_fields
+          |> filter_unnasociated_fields(schema, search_term_type)
+
+        base_query = from(s in schema, where: 1 == 2, select: s.id)
+
+        search_query =
+          Enum.reduce(search_fields, base_query, fn
             {association, fields}, q ->
-
               fields =
                 fields
                 |> filter_associated_fields(schema, association, search_term_type)
 
-              query = from(s in q, join: a in assoc(s, ^association))
-
-              Enum.reduce(fields, query, fn f, current_query ->
-                from([..., r] in current_query,
-                  or_where: field(r, ^f) == ^term
-                )
+              Enum.reduce(fields, q, fn f, current_query ->
+                other_query = from(s in schema, join: a in assoc(s, ^association), where: field(a, ^f) == ^term, select: s.id)
+                union(current_query, ^other_query)
               end)
 
             f, q ->
-              from(s in q, or_where: field(s, ^f) == ^term)
+              other_query = from(s in schema, where: field(s, ^f) == ^term, select: s.id)
+              union(q, ^other_query)
           end)
-      end
 
-    query = build_filtered_fields_query(query, filtered_fields)
+        query =
+          from(s in schema, where: s.id in subquery(search_query))
+          |> build_filtered_fields_query(filtered_fields)
 
-    limited_query =
-      from(s in query, limit: ^per_page, offset: ^current_offset, order_by: ^ordering)
+        limited_query =
+          from(s in query, limit: ^per_page, offset: ^current_offset, order_by: ^ordering)
 
-    {query, limited_query}
+        {query, limited_query}
+    end
   end
 
   defp typeof(value) do
