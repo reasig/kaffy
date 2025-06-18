@@ -3,6 +3,8 @@ defmodule Kaffy.ResourceQuery do
 
   import Ecto.Query
 
+  @count_threshold 100_000
+
   def list_resource(conn, resource, params \\ %{}) do
     per_page = Map.get(params, "limit", "100") |> String.to_integer()
     page = Map.get(params, "page", "1") |> String.to_integer()
@@ -83,14 +85,51 @@ defmodule Kaffy.ResourceQuery do
 
   def total_count(schema, do_cache, query, opts) do
     result =
-      from(s in query, select: fragment("count(*)"))
-      |> Kaffy.Utils.repo().one(opts)
+      if do_cache and Kaffy.Utils.repo().__adapter__() == Ecto.Adapters.Postgres do
+        result = estimate_total_count(schema, opts)
 
-    if do_cache and result > 100_000 do
+        if result > @count_threshold do
+          result
+        else
+          total_count_all(query, opts)
+        end
+      else
+        total_count_all(query, opts)
+      end
+
+    if do_cache and result > @count_threshold do
       Kaffy.Cache.Client.add_cache(schema, "count", result, 600)
     end
 
     result
+  end
+
+  defp total_count_all(query, opts) do
+    from(s in query, select: fragment("count(*)"))
+    |> Kaffy.Utils.repo().one(opts)
+  end
+
+  @doc """
+  Return the estimated number of rows for a schema.
+
+  This allows us to paginate large tables quickly without risk of timeout.
+
+  https://wiki.postgresql.org/wiki/Count_estimate
+  https://wiki.postgresql.org/wiki/Slow_Counting
+  """
+  def estimate_total_count(schema, opts \\ []) do
+    Kaffy.Utils.repo().query(
+      "SELECT reltuples::bigint AS estimate FROM pg_class WHERE relname = $1",
+      [schema.__schema__(:source)],
+      opts
+    )
+    |> case do
+      {:ok, %{rows: [[count]]}} ->
+        count
+
+      err ->
+        raise "Failed to estimate count for #{schema}: #{inspect(err)}"
+    end
   end
 
   def cached_total_count(schema, do_cache, query, opts \\ [])
