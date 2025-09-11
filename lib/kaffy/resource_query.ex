@@ -219,7 +219,6 @@ defmodule Kaffy.ResourceQuery do
   defp typeof(value) do
     cond do
       is_binary_id?(value) -> :binary_id
-      is_id?(value) -> :id
       true -> :string
     end
   end
@@ -229,13 +228,6 @@ defmodule Kaffy.ResourceQuery do
   end
 
   def is_binary_id?(_), do: false
-
-  def is_id?(str) when is_binary(str) do
-    case Integer.parse(str) do
-      {int, ""} when int > 0 -> true
-      _ -> false
-    end
-  end
 
   def is_id?(_), do: false
 
