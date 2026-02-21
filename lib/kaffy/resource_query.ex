@@ -186,7 +186,9 @@ defmodule Kaffy.ResourceQuery do
           search_fields
           |> filter_unnasociated_fields(schema, search_term_type)
 
-        base_query = from(s in schema, where: 1 == 2, select: s.id)
+        [pk | _] = Kaffy.ResourceSchema.primary_keys(schema)
+
+        base_query = from(s in schema, where: 1 == 2, select: field(s, ^pk))
 
         search_query =
           Enum.reduce(search_fields, base_query, fn
@@ -196,17 +198,17 @@ defmodule Kaffy.ResourceQuery do
                 |> filter_associated_fields(schema, association, search_term_type)
 
               Enum.reduce(fields, q, fn f, current_query ->
-                other_query = from(s in schema, join: a in assoc(s, ^association), where: field(a, ^f) == ^term, select: s.id)
+                other_query = from(s in schema, join: a in assoc(s, ^association), where: field(a, ^f) == ^term, select: field(s, ^pk))
                 union(current_query, ^other_query)
               end)
 
             f, q ->
-              other_query = from(s in schema, where: field(s, ^f) == ^term, select: s.id)
+              other_query = from(s in schema, where: field(s, ^f) == ^term, select: field(s, ^pk))
               union(q, ^other_query)
           end)
 
         query =
-          from(s in schema, where: s.id in subquery(search_query))
+          from(s in schema, where: field(s, ^pk) in subquery(search_query))
           |> build_filtered_fields_query(filtered_fields)
 
         limited_query =
