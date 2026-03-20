@@ -182,8 +182,11 @@ defmodule Kaffy.ResourceQuery do
 
         search_term_type = typeof(term)
 
+        {fragment_fields, standard_fields} =
+          Enum.split_with(search_fields, &is_fragment_field?/1)
+
         search_fields =
-          search_fields
+          standard_fields
           |> filter_unnasociated_fields(schema, search_term_type)
 
         [pk | _] = Kaffy.ResourceSchema.primary_keys(schema)
@@ -207,6 +210,12 @@ defmodule Kaffy.ResourceQuery do
               union(q, ^other_query)
           end)
 
+        search_query =
+          Enum.reduce(fragment_fields, search_query, fn {:json, field_name, json_key}, q ->
+            other_query = from(s in schema, where: fragment("?->>? = ?", field(s, ^field_name), ^json_key, ^term), select: field(s, ^pk))
+            union(q, ^other_query)
+          end)
+
         query =
           from(s in schema, where: field(s, ^pk) in subquery(search_query))
           |> build_filtered_fields_query(filtered_fields)
@@ -217,6 +226,9 @@ defmodule Kaffy.ResourceQuery do
         {query, limited_query}
     end
   end
+
+  defp is_fragment_field?({:json, _, _}), do: true
+  defp is_fragment_field?(_), do: false
 
   defp typeof(value) do
     cond do
